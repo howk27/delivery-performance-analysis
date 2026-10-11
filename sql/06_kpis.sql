@@ -91,3 +91,66 @@ SELECT is_late,
 FROM mart.fact_orders
 GROUP BY is_late
 ORDER BY is_late DESC;
+
+
+-- Promise test: how many days orders actually take, next to the promised days, per mode
+-- Saw: First Class: all 9,602 orders took 2 days against a promise of 1. Same Day: 51.6% took 0 days, 48.4% took 1 day (promise 0). Second Class: promise 2 days; actual days 2 to 6, each about 20% of orders (2,422 to 2,473 per value). Standard Class: promise 4 days; actual days 2 to 6, each about 20% (7,458 to 7,610 per value). Second Class and Standard Class have the same spread of actual days.
+-- Means: Second Class takes as long as Standard Class but promises half the time, and First Class always takes 2 days against a 1-day promise, so most lateness is a promise set shorter than what DataCo actually delivers.
+-- Do: Lead the findings with this: the promise, not the speed, creates most late orders. Standard Class also has a wide 2-to-6-day spread, which creates its 40% late. Add Issues Log row #17 (evenly spread day counts look generated) and keep it in the limits. Next, run the what-if for the size of the fix.
+SELECT shipping_mode,
+       days_sched,
+       days_real,
+       COUNT(*) AS orders,
+       ROUND(100.0 * COUNT(*) / SUM(COUNT(*)) OVER (PARTITION BY shipping_mode), 1) AS pct_of_mode
+FROM mart.fact_orders
+GROUP BY 1, 2, 3
+ORDER BY 1, 2, 3;
+
+
+-- What-if: late rate if the promise were 0, 1 or 2 days longer
+-- Saw: late_now matches KPI 3 for every mode (100.0, 80.0, 48.4, 39.8). With +1 day: First Class 0.0%, Same Day 0.0%, Second Class 60.2%, Standard Class 20.0%; all orders together fall from 57.3% (36,048 late) to 23.7% (14,918 late). With +2 days only Second Class is still late (40.0%, 4,908 orders); all orders together 7.8%.
+-- Means: Most late orders disappear if the promised days match the days DataCo already delivers, so the cheapest fix is the promise, not the warehouse.
+-- Do: Use +1 day (57.3% to 23.7%) and +2 days (to 7.8%) as the estimated impact of the promise recommendation, and say it assumes delivery times stay the same and customers accept longer promises. No Issues Log row (no data problem).
+SELECT shipping_mode,
+       COUNT(*) AS orders,
+       ROUND(100.0 * COUNT(*) FILTER (WHERE days_real > days_sched) / COUNT(*), 1) AS late_now,
+       ROUND(100.0 * COUNT(*) FILTER (WHERE days_real > days_sched + 1) / COUNT(*), 1) AS late_plus_1_day,
+       ROUND(100.0 * COUNT(*) FILTER (WHERE days_real > days_sched + 2) / COUNT(*), 1) AS late_plus_2_days
+FROM mart.fact_orders
+GROUP BY 1
+ORDER BY late_now DESC;
+
+
+-- Proof 1: row counts per layer
+-- Saw: raw 180,519 and clean 180,519 lines; fact_order_lines 172,765 lines (180,519 - 7,754 canceled); fact_orders 62,897 orders. Dimensions: shipping mode 4, geography 167, product 50, date 1,461 (2015-01-01 to 2018-12-31).
+-- Means: Nothing was lost between the raw file and the clean table, and the only rows removed afterwards are the canceled lines.
+-- Do: Use these counts in the method document. No Issues Log row (no data problem).
+SELECT 'raw.stg_dataco' AS layer, COUNT(*) AS row_count FROM raw.stg_dataco
+UNION ALL SELECT 'clean.order_lines', COUNT(*) FROM clean.order_lines
+UNION ALL SELECT 'mart.fact_orders', COUNT(*) FROM mart.fact_orders
+UNION ALL SELECT 'mart.fact_order_lines', COUNT(*) FROM mart.fact_order_lines
+UNION ALL SELECT 'mart.dim_shipping_mode', COUNT(*) FROM mart.dim_shipping_mode
+UNION ALL SELECT 'mart.dim_geography', COUNT(*) FROM mart.dim_geography
+UNION ALL SELECT 'mart.dim_product', COUNT(*) FROM mart.dim_product
+UNION ALL SELECT 'mart.dim_date', COUNT(*) FROM mart.dim_date;
+
+
+-- Proof 2: no personal data columns in clean or mart
+-- Saw: 0 columns in the clean and mart schemas with a name containing email, password, first or last name, street, zip or phone.
+-- Means: The customer email, password, name and street columns were left out in 04_clean.sql and never reach the model, the workbook or the dashboard.
+-- Do: State in the method document that personal data columns were removed in the clean step. No Issues Log row (row #13 already covers this).
+SELECT table_schema, table_name, column_name
+FROM information_schema.columns
+WHERE table_schema IN ('clean', 'mart')
+  AND column_name ILIKE ANY (ARRAY['%email%', '%password%', '%fname%', '%lname%', '%street%', '%zip%', '%phone%']);
+
+
+-- Proof 3: sales and profit reconcile across layers
+-- Saw: sales are 35,214,428.98 in fact_orders, fact_order_lines and the non-canceled lines of clean.order_lines; profit is 3,806,420.63 in fact_orders and in the same clean lines. All match the anchor numbers.
+-- Means: Collapsing lines into orders did not change the money, so every sales and profit figure in the report ties back to the clean table.
+-- Do: Use 35,214,428.98 in sales and 3,806,420.63 in profit as the totals everywhere (summary, workbook, dashboard). No Issues Log row (no data problem).
+SELECT (SELECT ROUND(SUM(total_sales), 2) FROM mart.fact_orders) AS orders_sales,
+       (SELECT ROUND(SUM(sales), 2) FROM mart.fact_order_lines) AS lines_sales,
+       (SELECT ROUND(SUM(sales), 2) FROM clean.order_lines WHERE NOT is_canceled) AS clean_sales,
+       (SELECT ROUND(SUM(total_profit), 2) FROM mart.fact_orders) AS orders_profit,
+       (SELECT ROUND(SUM(profit), 2) FROM clean.order_lines WHERE NOT is_canceled) AS clean_profit;
