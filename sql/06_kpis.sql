@@ -111,6 +111,7 @@ ORDER BY 1, 2, 3;
 -- Saw: late_now matches KPI 3 for every mode (100.0, 80.0, 48.4, 39.8). With +1 day: First Class 0.0%, Same Day 0.0%, Second Class 60.2%, Standard Class 20.0%; all orders together fall from 57.3% (36,048 late) to 23.7% (14,918 late). With +2 days only Second Class is still late (40.0%, 4,908 orders); all orders together 7.8%.
 -- Means: Most late orders disappear if the promised days match the days DataCo already delivers, so the cheapest fix is the promise, not the warehouse.
 -- Do: Use +1 day (57.3% to 23.7%) and +2 days (to 7.8%) as the estimated impact of the promise recommendation, and say it assumes delivery times stay the same and customers accept longer promises. Issues Log row #17 covers the data note.
+SELECT shipping_mode,
        COUNT(*) AS orders,
        ROUND(100.0 * COUNT(*) FILTER (WHERE days_real > days_sched) / COUNT(*), 1) AS late_now,
        ROUND(100.0 * COUNT(*) FILTER (WHERE days_real > days_sched + 1) / COUNT(*), 1) AS late_plus_1_day,
