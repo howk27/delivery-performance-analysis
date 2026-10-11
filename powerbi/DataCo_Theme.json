@@ -1,0 +1,32 @@
+{
+  "name": "DataCo Delivery Dark",
+  "dataColors": ["#F43F5E","#94A3B8","#64748B","#38BDF8","#CBD5E1","#475569","#FB7185","#334155"],
+  "background": "#0B1220",
+  "foreground": "#E2E8F0",
+  "tableAccent": "#F43F5E",
+  "good": "#34D399",
+  "neutral": "#94A3B8",
+  "bad": "#F43F5E",
+  "maximum": "#F43F5E",
+  "center": "#94A3B8",
+  "minimum": "#334155",
+  "textClasses": {
+    "label":   {"fontSize": 11, "fontFace": "Segoe UI", "color": "#CBD5E1"},
+    "callout": {"fontSize": 34, "fontFace": "Segoe UI Semibold", "color": "#F8FAFC"},
+    "title":   {"fontSize": 14, "fontFace": "Segoe UI Semibold", "color": "#F8FAFC"},
+    "header":  {"fontSize": 12, "fontFace": "Segoe UI Semibold", "color": "#F8FAFC"}
+  },
+  "visualStyles": {
+    "*": {
+      "*": {
+        "background": [{"show": true, "color": {"solid": {"color": "#162033"}}, "transparency": 0}],
+        "border": [{"show": true, "color": {"solid": {"color": "#26344D"}}, "radius": 10}],
+        "title": [{"show": true, "fontColor": {"solid": {"color": "#F8FAFC"}}, "fontSize": 14, "fontFamily": "Segoe UI Semibold"}],
+        "subTitle": [{"fontColor": {"solid": {"color": "#94A3B8"}}, "fontSize": 11}],
+        "visualHeader": [{"show": false}],
+        "padding": [{"top": 10, "bottom": 10, "left": 14, "right": 14}]
+      }
+    },
+    "page": {"*": {"background": [{"color": {"solid": {"color": "#0B1220"}}, "transparency": 0}]}}
+  }
+}
